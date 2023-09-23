@@ -1,6 +1,6 @@
 import tkinter, tkinter.filedialog, threading, os, subprocess, sys
 from yt_dlp import YoutubeDL
-from song import Song
+from application.song import Song
 
 class Application:
     def __init__(self):

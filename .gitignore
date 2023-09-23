@@ -8,3 +8,5 @@ dist/
 *.webm
 *.part
 *.m4a
+.pytest_cache/
+!unit_tests/lofi-chill.mp3

@@ -36,3 +36,8 @@ This data is not always available and can autopopulate fields with publishers or
  - The attached `build.bat` batch script will construct an executable to use in `/dist`.
  - The `/build` directory can be safely deleted after the build is complete.
  - Requires pyinstaller (`pip install pyinstaller`)
+
+### Unit Testing
+ - Unit tests require the `pytest` library ([Documentation](https://docs.pytest.org/en/stable/getting-started.html#get-started))
+ - Calling `pytest` in the `unit_tests` directory will automatically run all unit tests on hardcoded test values
+ - Test mp3 as `lofi-chill.mp3` used as a royalty free file ([Source](https://pixabay.com/music/beats-lofi-chill-medium-version-159456/))
