@@ -4,7 +4,7 @@ import pytest, os
 
 class TestMetadata:
     @pytest.fixture(autouse=True)
-    def handle_test_file(tmpdir):
+    def handle_test_file(self):
         os.system("copy lofi-chill.mp3 lofi-chill-copy.mp3")
         yield
         os.remove("lofi-chill-copy.mp3")

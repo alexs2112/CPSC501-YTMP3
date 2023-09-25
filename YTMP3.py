@@ -1,16 +1,17 @@
-import tkinter, tkinter.filedialog, threading, os, subprocess, sys
-from yt_dlp import YoutubeDL
+import tkinter, tkinter.filedialog, threading, os
 from application.song import Song
+from application.downloader import Downloader
 
 class Application:
     def __init__(self):
         self.window = tkinter.Tk()
         self.window.title("Youtube to MP3")
         self.window.resizable(False, False)
-        self.window.iconbitmap(self.executable_path("icon.ico"))
-        self.last_log = None
+        self.downloader = Downloader()
+        self.window.iconbitmap(self.downloader.executable_path("icon.ico"))
         self.last_artist = ""
         self.last_album = ""
+        self.last_log = None
         self.songs = []
         self.metadata = tkinter.IntVar()
         self.selected_song = tkinter.StringVar()
@@ -18,7 +19,7 @@ class Application:
         self.setup()
         self.reset_directory()
         self.initialize_songs()
-        self.check_for_ffmpeg()
+        self.downloader.check_for_ffmpeg(self)
 
     def setup(self):
         self.top_frame = tkinter.Frame(bg=self.colour_background)
@@ -99,6 +100,8 @@ class Application:
 
         self.bot_frame = tkinter.Frame(bg=self.colour_background)
         self.bot_frame.grid(row=1, column=0)
+
+        # This console is passed into the Logger object, as it is what prints to it
         self.console = tkinter.Text(master=self.bot_frame, height=20, bg=self.colour_foreground)
         self.console.pack(fill=tkinter.BOTH, expand=True)
 
@@ -164,139 +167,18 @@ class Application:
             # Don't allow the user to change the directory while a download is running
             self.directory.config(state="disabled")
 
-    def check_for_ffmpeg(self):
-        ffmpeg = self.executable_path("ffmpeg.exe")
-        if (os.path.exists(ffmpeg)):
-            return True
-        else:
-            self.warning("ffmpeg not found, files will not be converted to mp3 format.")
-            return False
-
-    def get_downloader(self, embed_metadata):
-        # Convert to mp3 if ffmpeg is available, otherwise leave as is
-        if (self.check_for_ffmpeg()):
-            postprocessors = [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }]
-            if embed_metadata: postprocessors.append({
-                "key": "FFmpegMetadata",
-                "add_metadata": True
-            })
-            audio = YoutubeDL({
-                "format": "bestaudio",
-                "postprocessors": postprocessors,
-                "ffmpeg_location": self.executable_path("ffmpeg.exe"),
-                "outtmpl": f"{self.directory.get()}\\%(title)s.%(ext)s",
-                "logger": self
-            })
-        else:
-            audio = YoutubeDL({
-                "format": "bestaudio",
-                "outtmpl": f"{self.directory.get()}\\%(title)s.%(ext)s",
-                "logger": self
-            })
-        return audio
-
     def download(self):
-        data = self.song_input.get("1.0", tkinter.END).split('\n')
-        songs = []
-        for link in data:
-            if "youtu.be" in link:
-                songs.append(link)
-            elif "playlist" in link:
-                ids = self.get_playlist_songs(link)
-                for id in ids:
-                    songs.append(f"https://youtu.be/{id}")
-            elif "music.youtube" in link:
-                songs.append(link)
-            elif "www.youtube.com" in link:
-                video_code = link.split("?v=")
-                if len(video_code) == 2:
-                    code = video_code[1].split("&")[0]
-                    songs.append(f"https://youtu.be/{code}")
-                else:
-                    self.error(f"Could not split {link} by '?v='")
-            elif len(link.strip()) > 0:
-                self.error(f"Could not read {link}, skipping.")
-
-        if (len(songs) == 0):
-            self.error("No songs to download")
-            self.directory.config(state="normal")
-            return
-
-        audio = self.get_downloader(embed_metadata = self.metadata.get())
-        failed = []
-        for i in range(len(songs)):
-            url = songs[i]
-            try:
-                data = audio.extract_info(url)
-                try:
-                    filepath = data['requested_downloads'][0]['filepath']
-                    title = os.path.basename(filepath)
-                except Exception as e:
-                    # The video title is not accurate to the filename, this may break
-                    # yt-dlp replaces certain punctuation marks to make them windows safe
-                    title = f"{data['title']}.mp3"  # data['ext'] returns m4a
-
-                self.add_song(title)
-            except Exception as e:
-                print(e)
-                failed.append(i)
-                continue
-
-        if len(failed) > 0:
-            self.error(f"\n{str(len(failed))} Failures Detected")    
-            for i in failed:
-                self.print(songs[i])
-
-        self.print(f"\nDownload Complete!\nFiles located at {self.directory.get()}\n")
+        self.downloader.download(
+            self,
+            self.song_input.get("1.0", tkinter.END).split('\n'),
+            self.directory.get(),
+            self.metadata.get(),)
 
         # Reallow users to edit the directory
         self.directory.config(state="normal")
 
-    def get_playlist_songs(self, url):
-        out = []
-        download = YoutubeDL({"simulate": True, "quiet": True})
-        self.debug("Downloading playlist data.")
-        try:
-            with download:
-                data = download.extract_info(url, download=False)
-                if 'entries' in data:
-                    video = data['entries']
-                    for i, _ in enumerate(video):
-                        out.append(data['entries'][i]['id'])
-        except Exception as e:
-            self.error("Could not retrieve playlist data.")
-            print(e)
-        self.debug(f"Found {str(len(out))} songs.")
-        return out
-
     def initialize_songs(self, _=None):
-        files = os.listdir(self.directory.get())
-        new_songs = []
-        for f in files:
-            n = f.rsplit('.', 1)
-            if len(n) > 1 and (n[1] == "mp3" or n[1] == "webm"):
-                new_songs.append(f)
-
-        # If the song loaded is already in songs, leave it there
-        new_new_songs = []
-        for song in self.songs:
-            if song in new_songs:
-                new_new_songs.append(song)
-                new_songs.remove(song)
-
-        # If the song loaded isn't already in songs, append it
-        for song in new_songs:
-            new_new_songs.append(song)
-        self.songs = new_new_songs
-
-        # Sort loaded songs by Artist + Album + Track Number
-        d = self.directory.get()
-        self.songs.sort(key=lambda s: Song(s, d).sort_attributes())
-
+        self.songs = self.downloader.sort_songs(self.directory.get(), self.songs)
         self.debug(f"{len(self.songs)} songs loaded.")
         self.clear_song()
         self.update_songs()
@@ -443,14 +325,6 @@ class Application:
             self.reset_directory()
             self.error(f"Could not find directory, resetting to default.")
 
-    def executable_path(self, path):
-        try:
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath("resources/")
-
-        return os.path.join(base_path, path)
-
     def initialize_colours(self):
         # http://cs111.wellesley.edu/archive/cs111_fall14/public_html/labs/lab12/tkintercolor.html
         self.colour_background = "DimGray"
@@ -458,13 +332,13 @@ class Application:
         self.colour_disabled_background = "Gray"
         self.window.configure(bg=self.colour_background)
 
-    # Some logging methods
     def print(self, msg):
         if self.last_log != None:
             msg = "\n" + msg
         self.console.insert(tkinter.END, msg)
         self.console.see(tkinter.END)
         self.last_log = msg
+
     def debug(self, msg):
         msg.strip()
 
@@ -474,8 +348,10 @@ class Application:
             self.console.delete(last, tkinter.END)
 
         self.print(msg if "[" in msg else f"[debug]: {msg}")
+
     def warning(self, msg):
         self.print(f"[warning]: {msg}")
+
     def error(self, msg):
         self.print(f"[error]: {msg}")
 
