@@ -85,8 +85,8 @@ class Downloader:
                 "logger": application
             })
         return audio
-
-    def download(self, application, data, directory, add_metadata):
+    
+    def process_data(self, application, data):
         songs = []
         for link in data:
             if "youtu.be" in link:
@@ -106,7 +106,10 @@ class Downloader:
                     application.error(f"Could not split {link} by '?v='")
             elif len(link.strip()) > 0:
                 application.error(f"Could not read {link}, skipping.")
+        return songs
 
+    def download(self, application, data, directory, add_metadata):
+        songs = self.process_data(application, data)
         if (len(songs) == 0):
             application.error("No songs to download")
             return
