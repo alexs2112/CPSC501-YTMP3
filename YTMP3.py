@@ -1,25 +1,26 @@
 import tkinter, tkinter.filedialog, threading, os
 from application.song import Song
 from application.downloader import Downloader
+from application.logger import Logger
 
 class Application:
     def __init__(self):
         self.window = tkinter.Tk()
         self.window.title("Youtube to MP3")
         self.window.resizable(False, False)
-        self.downloader = Downloader()
-        self.window.iconbitmap(self.downloader.executable_path("icon.ico"))
         self.last_artist = ""
         self.last_album = ""
-        self.last_log = None
         self.songs = []
         self.metadata = tkinter.IntVar()
         self.selected_song = tkinter.StringVar()
         self.initialize_colours()
         self.setup()
+        self.logger = Logger(self.console)
+        self.downloader = Downloader(self.logger)
+        self.window.iconbitmap(self.downloader.executable_path("icon.ico"))
         self.reset_directory()
         self.initialize_songs()
-        self.downloader.check_for_ffmpeg(self)
+        self.downloader.check_for_ffmpeg()
 
     def setup(self):
         self.top_frame = tkinter.Frame(bg=self.colour_background)
@@ -152,14 +153,14 @@ class Application:
     
     def check_thread(self):
         if threading.active_count() > 1:
-            self.error("Download in progress, please wait...")
+            self.logger.error("Download in progress, please wait...")
             return False
         else:
             return True
 
     def start_download(self, _):
         if self.check_thread():
-            self.debug("Initializing download.")
+            self.logger.debug("Initializing download.")
             self.thread = threading.Thread(target=self.download)
             self.thread.daemon = True
             self.thread.start()
@@ -169,17 +170,17 @@ class Application:
 
     def download(self):
         self.downloader.download(
-            self,
             self.song_input.get("1.0", tkinter.END).split('\n'),
             self.directory.get(),
-            self.metadata.get(),)
+            self.metadata.get(),
+            self.add_song)
 
         # Reallow users to edit the directory
         self.directory.config(state="normal")
 
     def initialize_songs(self, _=None):
         self.songs = self.downloader.sort_songs(self.directory.get(), self.songs)
-        self.debug(f"{len(self.songs)} songs loaded.")
+        self.logger.debug(f"{len(self.songs)} songs loaded.")
         self.clear_song()
         self.update_songs()
 
@@ -203,7 +204,7 @@ class Application:
         try:
             song = Song(self.selected_song.get(), self.directory.get())
         except Exception as e:
-            self.error(f"Cannot load {os.path.join(self.directory.get(), self.selected_song.get())}")
+            self.logger.error(f"Cannot load {os.path.join(self.directory.get(), self.selected_song.get())}")
             print(e)
             return
         return song
@@ -227,7 +228,7 @@ class Application:
             self.song_artist.config(state="disabled")
             self.song_album.config(state="disabled")
             self.song_track_num.config(state="disabled")
-            self.warning(f"'{song.filename}' is not of mp3 format, setting metadata is disabled.")
+            self.logger.warning(f"'{song.filename}' is not of mp3 format, setting metadata is disabled.")
         self.song_filename.focus_set()
 
     def save_and_next_song(self, _):
@@ -273,12 +274,12 @@ class Application:
             if tracknum.isnumeric():
                 song.set_tag("track_num", self.song_track_num.get())
             elif tracknum != "":
-                self.debug("Only input positive integers for track number.")
+                self.logger.debug("Only input positive integers for track number.")
 
             try:
                 song.save_tags()
             except Exception as e:
-                self.error(e)
+                self.logger.error(e)
                 print(e)
 
         new_fn = self.song_filename.get()
@@ -292,9 +293,9 @@ class Application:
                 self.selected_song.set(new_fn)
             except Exception as e:
                 print(e)
-                self.error(f"Failed to rename {self.selected_song.get()}.mp3")
-                self.error("Please refresh.")
-        self.debug(f"Song updated successfully!")
+                self.logger.error(f"Failed to rename {self.selected_song.get()}.mp3")
+                self.logger.error("Please refresh.")
+        self.logger.debug(f"Song updated successfully!")
         self.update_songs(clear)
         self.clear_song()
 
@@ -323,7 +324,7 @@ class Application:
     def check_directory(self):
         if not os.path.exists(self.directory.get()):
             self.reset_directory()
-            self.error(f"Could not find directory, resetting to default.")
+            self.logger.error(f"Could not find directory, resetting to default.")
 
     def initialize_colours(self):
         # http://cs111.wellesley.edu/archive/cs111_fall14/public_html/labs/lab12/tkintercolor.html
@@ -331,29 +332,6 @@ class Application:
         self.colour_foreground = "Silver"
         self.colour_disabled_background = "Gray"
         self.window.configure(bg=self.colour_background)
-
-    def print(self, msg):
-        if self.last_log != None:
-            msg = "\n" + msg
-        self.console.insert(tkinter.END, msg)
-        self.console.see(tkinter.END)
-        self.last_log = msg
-
-    def debug(self, msg):
-        msg.strip()
-
-        # Extra handling to pretty up the output and stop downloads from flooding the console
-        if "[download]" in msg and "[download]" in self.last_log and "Destination" not in self.last_log:
-            last = self.console.index("end-1c linestart")
-            self.console.delete(last, tkinter.END)
-
-        self.print(msg if "[" in msg else f"[debug]: {msg}")
-
-    def warning(self, msg):
-        self.print(f"[warning]: {msg}")
-
-    def error(self, msg):
-        self.print(f"[error]: {msg}")
 
 def main():
     app = Application()

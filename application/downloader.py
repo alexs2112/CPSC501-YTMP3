@@ -3,6 +3,9 @@ from application.song import Song
 from yt_dlp import YoutubeDL
 
 class Downloader:
+    def __init__(self, logger):
+        self.logger = logger
+
     def executable_path(self, path):
         try:
             base_path = sys._MEIPASS
@@ -11,12 +14,12 @@ class Downloader:
 
         return os.path.join(base_path, path)
     
-    def check_for_ffmpeg(self, application):
+    def check_for_ffmpeg(self):
         ffmpeg = self.executable_path("ffmpeg.exe")
         if (os.path.exists(ffmpeg)):
             return True
         else:
-            application.warning("ffmpeg not found, files will not be converted to mp3 format.")
+            self.logger.warning("ffmpeg not found, files will not be converted to mp3 format.")
             return False
     
     def sort_songs(self, directory, songs):
@@ -42,10 +45,10 @@ class Downloader:
         all_songs.sort(key=lambda s: Song(s, directory).sort_attributes())
         return all_songs
     
-    def get_playlist_songs(self, application, url):
+    def get_playlist_songs(self, url):
         out = []
         download = YoutubeDL({"simulate": True, "quiet": True})
-        application.debug("Downloading playlist data.")
+        self.logger.debug("Downloading playlist data.")
         try:
             with download:
                 data = download.extract_info(url, download=False)
@@ -54,14 +57,14 @@ class Downloader:
                     for i, _ in enumerate(video):
                         out.append(data['entries'][i]['id'])
         except Exception as e:
-            application.error("Could not retrieve playlist data.")
+            self.logger.error("Could not retrieve playlist data.")
             print(e)
-        application.debug(f"Found {str(len(out))} songs.")
+        self.logger.debug(f"Found {str(len(out))} songs.")
         return out
 
-    def get_downloader(self, application, directory, embed_metadata):
+    def get_downloader(self, directory, embed_metadata):
         # Convert to mp3 if ffmpeg is available, otherwise leave as is
-        if (self.check_for_ffmpeg(application)):
+        if (self.check_for_ffmpeg()):
             postprocessors = [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -76,23 +79,23 @@ class Downloader:
                 "postprocessors": postprocessors,
                 "ffmpeg_location": self.executable_path("ffmpeg.exe"),
                 "outtmpl": f"{directory}\\%(title)s.%(ext)s",
-                "logger": application
+                "logger": self.logger
             })
         else:
             audio = YoutubeDL({
                 "format": "bestaudio",
                 "outtmpl": f"{directory}\\%(title)s.%(ext)s",
-                "logger": application
+                "logger": self.logger
             })
         return audio
     
-    def process_data(self, application, data):
+    def process_data(self, data):
         songs = []
         for link in data:
             if "youtu.be" in link:
                 songs.append(link)
             elif "playlist" in link:
-                ids = self.get_playlist_songs(application, link)
+                ids = self.get_playlist_songs(link)
                 for id in ids:
                     songs.append(f"https://youtu.be/{id}")
             elif "music.youtube" in link:
@@ -103,18 +106,18 @@ class Downloader:
                     code = video_code[1].split("&")[0]
                     songs.append(f"https://youtu.be/{code}")
                 else:
-                    application.error(f"Could not split {link} by '?v='")
+                    self.logger.error(f"Could not split {link} by '?v='")
             elif len(link.strip()) > 0:
-                application.error(f"Could not read {link}, skipping.")
+                self.logger.error(f"Could not read {link}, skipping.")
         return songs
 
-    def download(self, application, data, directory, add_metadata):
-        songs = self.process_data(application, data)
+    def download(self, data, directory, add_metadata, add_song_method):
+        songs = self.process_data(data)
         if (len(songs) == 0):
-            application.error("No songs to download")
+            self.logger.error("No songs to download")
             return
 
-        audio = self.get_downloader(application, directory, add_metadata)
+        audio = self.get_downloader(directory, add_metadata)
         failed = []
         for i in range(len(songs)):
             url = songs[i]
@@ -128,15 +131,15 @@ class Downloader:
                     # yt-dlp replaces certain punctuation marks to make them windows safe
                     title = f"{data['title']}.mp3"  # data['ext'] returns m4a
 
-                application.add_song(title)
+                add_song_method(title)
             except Exception as e:
                 print(e)
                 failed.append(i)
                 continue
 
         if len(failed) > 0:
-            application.error(f"\n{str(len(failed))} Failures Detected")    
+            self.logger.error(f"\n{str(len(failed))} Failures Detected")    
             for i in failed:
-                application.print(songs[i])
+                self.logger.print(songs[i])
 
-        application.print(f"\nDownload Complete!\nFiles located at {directory}\n")
+        self.logger.print(f"\nDownload Complete!\nFiles located at {directory}\n")
