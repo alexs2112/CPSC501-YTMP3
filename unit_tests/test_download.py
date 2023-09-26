@@ -1,5 +1,5 @@
 import pytest, os
-from application.downloader import Downloader
+from application.downloader import Downloader, DownloadData
 
 # A logger that doesn't log anything
 class Dummy:
@@ -29,7 +29,8 @@ class TestDownload:
     def test_download(self):
         # More lofi beats
         data = ["https://music.youtube.com/watch?v=MG4vQOtVRMI&si=4vseqt5-SgG4tPbN"]
-        self.downloader.download(data, self.directory, False, self.add_song)
+        download_data = DownloadData(data, self.directory, False)
+        self.downloader.download(download_data, self.add_song)
 
         path = os.path.join(self.directory, "Lofi Chill Beats To Study To.webm")
         assert os.path.exists(path)

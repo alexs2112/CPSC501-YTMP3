@@ -1,6 +1,6 @@
 import tkinter, tkinter.filedialog, threading, os
 from application.song import Song
-from application.downloader import Downloader
+from application.downloader import Downloader, DownloadData
 from application.logger import Logger
 
 class Application:
@@ -169,10 +169,12 @@ class Application:
             self.directory.config(state="disabled")
 
     def download(self):
-        self.downloader.download(
+        download_data = DownloadData(
             self.song_input.get("1.0", tkinter.END).split('\n'),
             self.directory.get(),
-            self.metadata.get(),
+            self.metadata.get())
+        self.downloader.download(
+            download_data,
             self.add_song)
 
         # Reallow users to edit the directory

@@ -2,6 +2,12 @@ import os, sys
 from application.song import Song
 from yt_dlp import YoutubeDL
 
+class DownloadData:
+    def __init__(self, input, directory, add_metadata):
+        self.input = input
+        self.directory = directory
+        self.add_metadata = add_metadata
+
 class Downloader:
     def __init__(self, logger):
         self.logger = logger
@@ -111,25 +117,25 @@ class Downloader:
                 self.logger.error(f"Could not read {link}, skipping.")
         return songs
 
-    def download(self, data, directory, add_metadata, add_song_method):
-        songs = self.process_data(data)
+    def download(self, download_data, add_song_method):
+        songs = self.process_data(download_data.input)
         if (len(songs) == 0):
             self.logger.error("No songs to download")
             return
 
-        audio = self.get_downloader(directory, add_metadata)
+        audio = self.get_downloader(download_data.directory, download_data.add_metadata)
         failed = []
         for i in range(len(songs)):
             url = songs[i]
             try:
-                data = audio.extract_info(url)
+                song_data = audio.extract_info(url)
                 try:
-                    filepath = data['requested_downloads'][0]['filepath']
+                    filepath = song_data['requested_downloads'][0]['filepath']
                     title = os.path.basename(filepath)
                 except Exception as e:
                     # The video title is not accurate to the filename, this may break
                     # yt-dlp replaces certain punctuation marks to make them windows safe
-                    title = f"{data['title']}.mp3"  # data['ext'] returns m4a
+                    title = f"{song_data['title']}.mp3"  # data['ext'] returns m4a
 
                 add_song_method(title)
             except Exception as e:
@@ -142,4 +148,4 @@ class Downloader:
             for i in failed:
                 self.logger.print(songs[i])
 
-        self.logger.print(f"\nDownload Complete!\nFiles located at {directory}\n")
+        self.logger.print(f"\nDownload Complete!\nFiles located at {download_data.directory}\n")
