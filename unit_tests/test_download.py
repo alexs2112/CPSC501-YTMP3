@@ -3,10 +3,20 @@ from application.downloader import Downloader, DownloadData
 
 # A logger that doesn't log anything
 class Dummy:
-    def print(self, _): pass
-    def debug(self, _): pass
-    def warning(self, _): pass
-    def error(self, _): pass
+    def __init__(self):
+        self.last_message = ""
+
+    def print(self, msg):
+        self.last_message = msg
+
+    def debug(self, msg):
+        self.print(msg)
+
+    def warning(self, msg):
+        self.print(msg)
+
+    def error(self, msg):
+        self.print(msg)
 
 class TestDownload:
     def add_song(self, song):
@@ -55,3 +65,9 @@ class TestDownload:
              '0usdnKRuSFo']
         assert songs == expected
 
+    def test_empty(self):
+        data = []
+        download_data = DownloadData(data, self.directory, False)
+        self.downloader.download(download_data, self.add_song)
+
+        assert self.downloader.logger.last_message == "No songs to download"

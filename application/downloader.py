@@ -28,29 +28,6 @@ class Downloader:
             self.logger.warning("ffmpeg not found, files will not be converted to mp3 format.")
             return False
     
-    def sort_songs(self, directory, songs):
-        files = os.listdir(directory)
-        new_songs = []
-        for f in files:
-            n = f.rsplit('.', 1)
-            if len(n) > 1 and (n[1] == "mp3" or n[1] == "webm"):
-                new_songs.append(f)
-
-        # If the song loaded is already in songs, leave it there
-        all_songs = []
-        for song in songs:
-            if song in new_songs:
-                all_songs.append(song)
-                new_songs.remove(song)
-
-        # If the song loaded isn't already in songs, append it
-        for song in new_songs:
-            all_songs.append(song)
-
-        # Sort loaded songs by Artist + Album + Track Number
-        all_songs.sort(key=lambda s: Song(s, directory).sort_attributes())
-        return all_songs
-    
     def get_playlist_songs(self, url):
         out = []
         download = YoutubeDL({"simulate": True, "quiet": True})
