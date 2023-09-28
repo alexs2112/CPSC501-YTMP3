@@ -3,6 +3,8 @@ from application.song import Song
 from application.logger import Logger
 
 class Interface:
+    METADATA = ["Filename", "Song Name", "Artist", "Album", "Track Number"]
+
     def __init__(self, songs, start_download_method):
         self.songs = songs
         self.last_artist = ""
@@ -20,130 +22,145 @@ class Interface:
         self.colour_disabled_background = "Gray"
 
     def setup(self, start_download_method):
-        self.top_frame = tkinter.Frame(bg=self.colour_background)
-        self.top_frame.grid(row=0, column=0)
+        top_frame = tkinter.Frame(bg=self.colour_background)
+        top_frame.grid(row=0, column=0)
+        self.get_console_frame()
 
-        self.input_frame = tkinter.Frame(master=self.top_frame, bg=self.colour_background)
-        self.input_frame.grid(row=0, column=0)
+        input_frame = self.get_input_frame(top_frame)
+        input_frame_buttons = self.get_input_frame_buttons(input_frame, start_download_method)
+        input_frame_buttons.pack()
+        input_frame.grid(row=0, column=0)
 
-        self.input_title = tkinter.Label(master=self.input_frame, text="Youtube URLs:", pady=6, bg=self.colour_background)
-        self.input_title.pack()
-        self.song_input = tkinter.Text(master=self.input_frame, width=30, height=15, bg=self.colour_foreground, undo=True)
+        right_frame = self.get_right_frame(top_frame)
+        song_frame = self.get_song_frame(right_frame)
+        self.get_song_frame_buttons(song_frame)
+        self.bind_tab_functionality()
+        self.get_directory_frame(right_frame)
+        right_frame.grid(row=0, column=1)
+    
+    def get_input_frame(self, top_frame):
+        input_frame = self.new_frame(top_frame)
+
+        input_title = tkinter.Label(master=input_frame, text="Youtube URLs:", pady=6, bg=self.colour_background)
+        input_title.pack()
+        self.song_input = tkinter.Text(master=input_frame, width=30, height=15, bg=self.colour_foreground, undo=True)
         self.song_input.pack()
 
-        self.input_frame_buttons = tkinter.Frame(master=self.input_frame, bg=self.colour_background)
-        self.input_frame_buttons.pack()
-        self.dl_button = tkinter.Button(master=self.input_frame_buttons, text="Start Download", padx=10, pady=2)
-        self.dl_button.bind("<Button-1>", start_download_method)
-        self.dl_button.grid(row=0, column=0)
-        self.enable_metadata_button = tkinter.Checkbutton(master=self.input_frame_buttons, text="Fill Metadata", padx=10, pady=2, variable=self.metadata, bg=self.colour_background, activebackground=self.colour_background)
-        self.enable_metadata_button.grid(row=0, column=1)
+        return input_frame
+    
+    def get_input_frame_buttons(self, input_frame, start_download_method):
+        input_frame_buttons = self.new_frame(input_frame)
+        
+        dl_button = tkinter.Button(master=input_frame_buttons, text="Start Download", padx=10, pady=2)
+        dl_button.bind("<Button-1>", start_download_method)
+        dl_button.grid(row=0, column=0)
+        
+        enable_metadata_button = tkinter.Checkbutton(master=input_frame_buttons, text="Fill Metadata", padx=10, pady=2, variable=self.metadata, bg=self.colour_background, activebackground=self.colour_background)
+        enable_metadata_button.grid(row=0, column=1)
+        
+        return input_frame_buttons
 
-        self.right_frame = tkinter.Frame(master=self.top_frame, bg=self.colour_background)
-        self.right_frame.grid(row=0, column=1)
-        self.song_frame = tkinter.Frame(master=self.right_frame, bg=self.colour_background)
-        self.song_frame.grid(row=0, column=0, pady=20, sticky="W")
+    def get_right_frame(self, top_frame):
+        right_frame = self.new_frame(top_frame)
+        return right_frame
+    
+    def get_song_frame(self, right_frame):
+        song_frame = self.new_frame(right_frame)
+        song_frame.grid(row=0, column=0, pady=20, sticky="W")
 
         # SELECT SONG
-        self.select_song_frame = tkinter.Frame(master=self.song_frame, bg=self.colour_background)
-        self.select_song_frame.grid(row=0, column=1)
-        self.song_options = tkinter.OptionMenu(self.select_song_frame, self.selected_song, None, [])
+        select_song_frame = self.new_frame(song_frame)
+        select_song_frame.grid(row=0, column=1)
+        self.song_options = tkinter.OptionMenu(select_song_frame, self.selected_song, None, [])
         self.song_options.bind("<Configure>", self.select_song)
         self.song_options.pack()
 
         # SET SONG DETAILS
-        self.field_frame = tkinter.Frame(master=self.song_frame, bg=self.colour_background)
-        self.field_frame.grid(row=1, column=0)
+        field_frame = self.new_frame(song_frame)
+        field_frame.grid(row=1, column=0)
+        entry_frame = self.new_frame(song_frame)
+        entry_frame.grid(row=1, column=1)
+        self.get_song_metadata_frames(field_frame, entry_frame)
+        self.song_data["Track Number"].bind("<Return>", self.save_and_next_song)
 
-        self.entry_frame = tkinter.Frame(master=self.song_frame, bg=self.colour_background)
-        self.entry_frame.grid(row=1, column=1)
+        return song_frame
 
-        self.field_filename = tkinter.Label(master=self.field_frame, text="Filename:", padx=10, bg=self.colour_background)
-        self.song_filename = tkinter.Entry(master=self.entry_frame, width=25, bg=self.colour_foreground)
-        self.field_filename.pack()
-        self.song_filename.pack()
+    def get_song_metadata_frames(self, field_frame, entry_frame):
+        self.song_data = {}
+        for metadata in Interface.METADATA:
+            field = tkinter.Label(master=field_frame, text=f"{metadata}:", padx=10, bg=self.colour_background)
+            entry = tkinter.Entry(master=entry_frame, width=25, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
+            field.pack()
+            entry.pack()
+            self.song_data[metadata] = entry
 
-        self.field_songname = tkinter.Label(master=self.field_frame, text="Song Name:", padx=10, bg=self.colour_background)
-        self.song_songname = tkinter.Entry(master=self.entry_frame, width=25, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
-        self.field_songname.pack()
-        self.song_songname.pack()
+    def get_song_frame_buttons(self, song_frame):
+        save_song_frame = self.new_frame(song_frame)
+        save_song_frame.grid(row=2, column=1)
+        save_song_button = tkinter.Button(master=save_song_frame, text="Save Song", padx=20, pady=2)
+        save_song_button.bind("<Button-1>", self.save_song)
+        save_song_button.pack()
 
-        self.field_artist = tkinter.Label(master=self.field_frame, text="Artist:", padx=10, bg=self.colour_background)
-        self.song_artist = tkinter.Entry(master=self.entry_frame, width=25, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
-        self.field_artist.pack()
-        self.song_artist.pack()
-
-        self.field_album = tkinter.Label(master=self.field_frame, text="Album:", padx=10, bg=self.colour_background)
-        self.song_album = tkinter.Entry(master=self.entry_frame, width=25, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
-        self.field_album.pack()
-        self.song_album.pack()
-
-        self.field_track_num = tkinter.Label(master=self.field_frame, text="Track Number:", padx=10, bg=self.colour_background)
-        self.song_track_num = tkinter.Entry(master=self.entry_frame, width=25, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
-        self.song_track_num.bind("<Return>", self.save_and_next_song)
-        self.field_track_num.pack()
-        self.song_track_num.pack()
-
-        self.save_song_frame = tkinter.Frame(master=self.song_frame, bg=self.colour_background)
-        self.save_song_frame.grid(row=2, column=1)
-        self.save_song_button = tkinter.Button(master=self.save_song_frame, text="Save Song", padx=20, pady=2)
-        self.save_song_button.bind("<Button-1>", self.save_song)
-        self.save_song_button.pack()
-
-        self.refresh_songs_frame = tkinter.Frame(master=self.song_frame, bg=self.colour_background)
-        self.refresh_songs_frame.grid(row=3, column=1)
-        self.refresh_songs_button = tkinter.Button(master=self.refresh_songs_frame, text="Refresh Songs", padx=10, pady=2)
-        self.refresh_songs_button.bind("<Button-1>", self.initialize_songs)
-        self.refresh_songs_button.pack()
-
-        self.bot_frame = tkinter.Frame(bg=self.colour_background)
-        self.bot_frame.grid(row=1, column=0)
+        refresh_songs_frame = self.new_frame(song_frame)
+        refresh_songs_frame.grid(row=3, column=1)
+        refresh_songs_button = tkinter.Button(master=refresh_songs_frame, text="Refresh Songs", padx=10, pady=2)
+        refresh_songs_button.bind("<Button-1>", self.initialize_songs)
+        refresh_songs_button.pack()
+    
+    def bind_tab_functionality(self):
+        self.song_data["Filename"].bind("<Return>", lambda _: self.song_data["Song Name"].focus_set())
+        self.song_data["Song Name"].bind("<Return>", self.tab_songname)
+        self.song_data["Song Name"].bind("<Tab>", self.tab_songname)
+        self.song_data["Artist"].bind("<Return>", self.tab_artist)
+        self.song_data["Artist"].bind("<Tab>", self.tab_artist)
+        self.song_data["Album"].bind("<Return>", self.tab_album)
+        self.song_data["Album"].bind("<Tab>", self.tab_album)
+    
+    def get_console_frame(self):
+        bot_frame = tkinter.Frame(bg=self.colour_background)
+        bot_frame.grid(row=1, column=0)
 
         # This console is passed into the Logger object, as it is what prints to it
-        self.console = tkinter.Text(master=self.bot_frame, height=20, bg=self.colour_foreground)
+        self.console = tkinter.Text(master=bot_frame, height=20, bg=self.colour_foreground)
         self.console.pack(fill=tkinter.BOTH, expand=True)
+    
+    def get_directory_frame(self, right_frame):
+        directory_frame = self.new_frame(right_frame)
+        directory_frame.grid(row=1, column=0, padx=5)
+        directory_text = tkinter.Label(master=directory_frame, text="Directory:", padx=10, bg=self.colour_background)
+        directory_text.pack()
 
-        # Pressing ENTER on the entry fields go to the next field and auto populate if needed
-        self.song_filename.bind("<Return>", lambda _: self.song_songname.focus_set())
-        self.song_songname.bind("<Return>", self.tab_songname)
-        self.song_songname.bind("<Tab>", self.tab_songname)
-        self.song_artist.bind("<Return>", self.tab_artist)
-        self.song_artist.bind("<Tab>", self.tab_artist)
-        self.song_album.bind("<Return>", self.tab_album)
-        self.song_album.bind("<Tab>", self.tab_album)
-
-        # SET DIRECTORY
-        self.directory_frame = tkinter.Frame(master=self.right_frame, bg=self.colour_background)
-        self.directory_frame.grid(row=1, column=0, padx=5)
-        self.directory_text = tkinter.Label(master=self.directory_frame, text="Directory:", padx=10, bg=self.colour_background)
-        self.directory_text.pack()
-        self.directory = tkinter.Entry(master=self.directory_frame, width=55, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
+        self.directory = tkinter.Entry(master=directory_frame, width=55, bg=self.colour_foreground, disabledbackground=self.colour_disabled_background)
         self.directory.bind("<Return>", self.set_directory)
         self.directory.pack()
-        self.directory_button_frame = tkinter.Frame(master=self.directory_frame, bg=self.colour_background)
-        self.directory_button_frame.pack()
-        self.directory_button = tkinter.Button(master=self.directory_button_frame, text="Choose Folder", padx=10, pady=2)
-        self.directory_button.bind("<Button-1>", self.select_directory)
-        self.directory_button.grid(row=0, column=0)
-        self.open_dir_button = tkinter.Button(master=self.directory_button_frame, text="Open Folder", padx=20, pady=2)
-        self.open_dir_button.bind("<Button-1>", self.open_directory)
-        self.open_dir_button.grid(row=0, column=1)
+
+        directory_button_frame = tkinter.Frame(master=directory_frame, bg=self.colour_background)
+        directory_button_frame.pack()
+        directory_button = tkinter.Button(master=directory_button_frame, text="Choose Folder", padx=10, pady=2)
+        directory_button.bind("<Button-1>", self.select_directory)
+        directory_button.grid(row=0, column=0)
+        open_dir_button = tkinter.Button(master=directory_button_frame, text="Open Folder", padx=20, pady=2)
+        open_dir_button.bind("<Button-1>", self.open_directory)
+        open_dir_button.grid(row=0, column=1)
+
+    def new_frame(self, master):
+        return tkinter.Frame(master=master, bg=self.colour_background)
 
     def tab_songname(self, _):
-        self.song_artist.focus_set()
-        if len(self.song_songname.get()) == 0:
-            path = self.song_filename.get()
-            self.song_songname.insert(0, path.rsplit(".mp3")[0].rsplit(".webm")[0].rsplit(".m4a")[0])
+        self.song_data["Artist"].focus_set()
+        if len(self.song_data["Song Name"].get()) == 0:
+            path = self.song_data["Filename"].get()
+            self.song_data["Song Name"].insert(0, path.rsplit(".mp3")[0].rsplit(".webm")[0].rsplit(".m4a")[0])
 
     def tab_artist(self, _):
-        self.song_album.focus_set()
-        if len(self.song_artist.get()) == 0 and self.last_artist:
-            self.song_artist.insert(0, self.last_artist)
+        self.song_data["Album"].focus_set()
+        if len(self.song_data["Artist"].get()) == 0 and self.last_artist:
+            self.song_data["Artist"].insert(0, self.last_artist)
 
     def tab_album(self, _):
-        self.song_track_num.focus_set()
-        if len(self.song_album.get()) == 0 and self.last_album:
-            self.song_album.insert(0, self.last_album)
+        self.song_data["Track Number"].focus_set()
+        if len(self.song_data["Album"].get()) == 0 and self.last_album:
+            self.song_data["Album"].insert(0, self.last_album)
     
     def disable_directory(self):
         self.directory.config(state="disabled")
@@ -191,31 +208,23 @@ class Interface:
         song = self.get_selected_song()
         if song == None: return
         self.clear_song()
-        self.song_filename.insert(0, song.filename)
+        self.song_data["Filename"].insert(0, song.filename)
 
         if self.song_is_mp3(song):
-            self.song_songname.insert(0, song.get_tag('title'))
-            self.song_artist.insert(0, song.get_tag('artist'))
-            self.song_album.insert(0, song.get_tag('album'))
-            self.song_track_num.insert(0, song.get_tag('track_num'))
+            self.song_data["Song Name"].insert(0, song.get_tag('title'))
+            self.song_data["Artist"].insert(0, song.get_tag('artist'))
+            self.song_data["Album"].insert(0, song.get_tag('album'))
+            self.song_data["Track Number"].insert(0, song.get_tag('track_num'))
         else:
-            self.song_songname.config(state="disabled")
-            self.song_artist.config(state="disabled")
-            self.song_album.config(state="disabled")
-            self.song_track_num.config(state="disabled")
+            for field in Interface.METADATA[1:]:
+                self.song_data[field].config(state="disabled")
             self.logger.warning(f"'{song.filename}' is not of mp3 format, setting metadata is disabled.")
-        self.song_filename.focus_set()
+        self.song_data["Filename"].focus_set()
     
     def clear_song(self):
-        self.song_songname.config(state="normal")
-        self.song_artist.config(state="normal")
-        self.song_album.config(state="normal")
-        self.song_track_num.config(state="normal")
-        self.song_filename.delete(0, tkinter.END)
-        self.song_songname.delete(0, tkinter.END)
-        self.song_artist.delete(0, tkinter.END)
-        self.song_album.delete(0, tkinter.END)
-        self.song_track_num.delete(0, tkinter.END)
+        for field in Interface.METADATA:
+            self.song_data[field].config(state="normal")
+            self.song_data[field].delete(0, tkinter.END)
     
     def save_and_next_song(self, _):
         self.save_song(_, False)
@@ -239,15 +248,15 @@ class Interface:
         if song == None: return
 
         if self.song_is_mp3(song):
-            song.set_tag("artist", self.song_artist.get())
-            song.set_tag("album", self.song_album.get())
-            song.set_tag("title", self.song_songname.get())
-            self.last_artist = self.song_artist.get()
-            self.last_album = self.song_album.get()
+            song.set_tag("artist", self.song_data["Artist"].get())
+            song.set_tag("album", self.song_data["Album"].get())
+            song.set_tag("title", self.song_data["Song Name"].get())
+            self.last_artist = self.song_data["Artist"].get()
+            self.last_album = self.song_data["Album"].get()
 
-            tracknum = self.song_track_num.get()
+            tracknum = self.song_data["Track Number"].get()
             if tracknum.isnumeric():
-                song.set_tag("track_num", self.song_track_num.get())
+                song.set_tag("track_num", tracknum)
             elif tracknum != "":
                 self.logger.debug("Only input positive integers for track number.")
 
@@ -257,7 +266,7 @@ class Interface:
                 self.logger.error(e)
                 print(e)
 
-        new_fn = self.song_filename.get()
+        new_fn = self.song_data["Filename"].get()
         if new_fn != self.selected_song.get():
             i = self.songs.index(self.selected_song.get())
             if '.mp3' not in new_fn and '.webm' not in new_fn:
@@ -271,7 +280,7 @@ class Interface:
                 self.logger.error(f"Failed to rename {self.selected_song.get()}.mp3")
                 self.logger.error("Please refresh.")
         self.logger.debug(f"Song updated successfully!")
-        self.update_songs(self.songs, clear)
+        self.update_songs(clear)
         self.clear_song()
     
     def sort_songs(self):
@@ -312,7 +321,6 @@ class Interface:
         self.initialize_songs()
 
     def select_directory(self, _):
-        print(threading.active_count())
         if threading.active_count() == 1:
             directory = tkinter.filedialog.askdirectory(initialdir=os.getcwd())
             if len(directory) == 0:
